@@ -97,8 +97,10 @@ const V=(e,n,z)=>new THREE.Vector3(e,z,-n);
 const surf=[];            // superficies sobre las que se apoyan las líneas
 let dz=93;                // desfase entre la cota del modelo del vuelo y la cota cartográfica
 const ray=new THREE.Raycaster(); ray.firstHitOnly=true; const DOWN=new THREE.Vector3(0,-1,0);
-function ground(e,n,zc){ray.set(new THREE.Vector3(e,5000,-n),DOWN); const h=ray.intersectObjects(surf,false)[0]; return h?h.point.y:zc+dz;}
-const P=(p,lift)=>V(p[0],p[1],ground(p[0],p[1],p[2])-0+(lift||0)).setY(ground(p[0],p[1],p[2])+(lift||0));
+// Cota de apoyo: superficie más alta bajo el punto, siempre que sea coherente con la cota cartográfica; si no, la cartográfica.
+function ground(e,n,zc){ray.set(new THREE.Vector3(e,5000,-n),DOWN); const h=ray.intersectObjects(surf,false)[0]; const exp=zc+dz;
+  if(!h) return exp; const d=h.point.y-exp; return (d>32||d<-16)?exp:h.point.y;}
+const P=(p,lift)=>V(p[0],p[1],ground(p[0],p[1],p[2])+(lift||0));
 
 function tube(pts,col,r,lift,op){if(!pts||pts.length<2) return new THREE.Group();
   const c=new THREE.CatmullRomCurve3(pts.map(p=>P(p,lift)),false,'catmullrom',0.05);
@@ -123,6 +125,19 @@ loader.load('modelo.glb', async gltf=>{
   // desfase vertical: mediana de (modelo - cota cartográfica) en puntos de las líneas que caen sobre el modelo
   const dif=[]; for(const id in D.alt){D.alt[id].line.forEach((p,i)=>{if(i%6) return; ray.set(new THREE.Vector3(p[0],5000,-p[1]),DOWN); const h=ray.intersectObjects(surf,false)[0]; if(h) dif.push(h.point.y-p[2]);});}
   if(dif.length>20){dif.sort((a,b)=>a-b); dz=dif[Math.floor(dif.length/2)];}
+  // Limpieza del modelo del vuelo: se retiran los triángulos sueltos o deformados (muy por encima o por debajo del terreno
+  // cartográfico), para que la tubería no quede apoyada en fragmentos en el aire. Ahí se ve el terreno de apoyo.
+  {const W=D.W,H=D.H, i1=W-1, i2=(H-1)*W;
+   const x0=D.gx[0],y0=D.gy[0], ax=D.gx[i1]-x0, ay=D.gy[i1]-y0, bx=D.gx[i2]-x0, by=D.gy[i2]-y0, det=ax*by-ay*bx;
+   const ref=(x,y)=>{const u=x-x0,v=y-y0; let c=(u*by-v*bx)/det*(W-1), r=(ax*v-ay*u)/det*(H-1);
+     if(c<0||r<0||c>W-1||r>H-1) return null; const c0=Math.min(Math.floor(c),W-2), r0=Math.min(Math.floor(r),H-2), fx=c-c0, fy=r-r0, g=D.gz, k=r0*W+c0;
+     return g[k]*(1-fx)*(1-fy)+g[k+1]*fx*(1-fy)+g[k+W]*(1-fx)*fy+g[k+W+1]*fx*fy;};
+   surf.forEach(o=>{const geo=o.geometry, pos=geo.attributes.position, idx=geo.index; if(!idx) return;
+     const bad=new Uint8Array(pos.count);
+     for(let i=0;i<pos.count;i++){const z=ref(pos.getX(i),pos.getY(i)); if(z===null) continue; const d=pos.getZ(i)-(z+dz); if(d>32||d<-16) bad[i]=1;}
+     const src=idx.array, out=new src.constructor(src.length); let n=0;
+     for(let t=0;t<src.length;t+=3){const a=src[t],b=src[t+1],c=src[t+2]; if(bad[a]||bad[b]||bad[c]) continue; out[n++]=a; out[n++]=b; out[n++]=c;}
+     geo.setIndex(new THREE.BufferAttribute(out.slice(0,n),1)); geo.disposeBoundsTree(); geo.computeBoundsTree();});}
   // terreno de apoyo (ortofoto oficial) para lo que queda fuera del modelo del vuelo
   const g=new THREE.BufferGeometry(); const n=D.W*D.H, pos=new Float32Array(n*3), uv=new Float32Array(n*2);
   for(let i=0;i<n;i++){pos[3*i]=D.gx[i];pos[3*i+1]=D.gz[i]+dz-4;pos[3*i+2]=-D.gy[i]; uv[2*i]=(i%D.W)/(D.W-1); uv[2*i+1]=1-Math.floor(i/D.W)/(D.H-1);}
