@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelo 3D — Línea de impulsión PTAP – tanques, Anorí (13/11/2026)</title>
+<style>
+  :root{--act:#ff9d1c}
+  html,body{margin:0;height:100%;background:#14161a;color:#e8e8e8;font-family:system-ui,sans-serif;overflow:hidden}
+  header{position:fixed;top:0;left:0;right:0;padding:9px 16px;background:rgba(20,22,25,.88);backdrop-filter:blur(6px);z-index:10}
+  header h1{margin:0;font-size:15px;font-weight:600}
+  header p{margin:2px 0 0;font-size:12px;color:#9aa0a6}
+  #c{width:100%;height:100%;display:block;touch-action:none}
+  #tabs{position:fixed;top:58px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10;max-width:calc(100vw - 16px)}
+  #tabs button{background:rgba(30,33,38,.92);color:#c9ced4;border:1px solid #3a3f46;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  #tabs button.on{background:var(--c);border-color:var(--c);color:#14161a}
+  #panel{position:fixed;top:104px;left:12px;width:min(330px,calc(100vw - 24px));max-height:calc(100% - 170px);overflow:auto;background:rgba(24,27,32,.94);border:1px solid #3a3f46;border-radius:10px;padding:12px 13px;z-index:9;font-size:12.5px}
+  #panel h2{margin:0 0 3px;font-size:16px;color:var(--act)}
+  #panel h3{margin:12px 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9aa0a6;font-weight:600}
+  #panel p{margin:0 0 8px;line-height:1.4}
+  dl{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:0;font-variant-numeric:tabular-nums}
+  dt{color:#9aa0a6} dd{margin:0;text-align:right;font-weight:600}
+  .ok{color:#5df2a8}.warn{color:#ffc46b}
+  ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;color:#b8bec5} ul b{color:#e8e8e8;font-weight:600}
+  .nb{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;text-align:center;font-weight:700;font-size:11px;color:#14161a;margin-right:6px}
+  .cr{color:#b8bec5} .cr b{color:#35e0ff}
+  .lg{display:grid;gap:5px} .lg label{display:flex;gap:8px;align-items:center;cursor:pointer}
+  .sw{display:inline-block;width:16px;height:5px;border-radius:2px}
+  #ui{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;flex-wrap:wrap;justify-content:center}
+  #ui button{background:rgba(30,33,38,.92);color:#e8e8e8;border:1px solid #3a3f46;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer}
+  #ui button:hover{background:#2c3037}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#14161a;z-index:20;transition:opacity .4s}
+  #bar{width:220px;height:4px;background:#2c3037;border-radius:2px;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:#4a90d9}
+  @media (max-width:700px){header p{display:none}#tabs{top:44px}#tabs button{padding:7px 9px;font-size:12px}#panel{top:88px;max-height:42%}#panel.min{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Modelo 3D — Línea de impulsión PTAP – tanques, Anorí</h1>
+  <p>Vuelo 13/11/2026 · 208 imágenes · Quebrada San Gregorio con su faja de 30 m · Arrastrar: rotar · Rueda: zoom · Clic derecho o 2 dedos: mover · Doble clic: centrar ahí</p>
+</header>
+<canvas id="c"></canvas>
+<nav id="tabs"></nav>
+<aside id="panel">
+  <h2 id="tt"></h2><p id="ds"></p>
+  <dl id="kv"></dl>
+  <div id="cz"><h3>Puntos de cruce y su justificación</h3><div id="czl"></div></div>
+  <h3>Predios que recorre (números en el modelo)</h3><ul id="pl"></ul>
+  <h3>Tramos de pendiente fuerte (en amarillo)</h3><ul id="pd"></ul>
+  <h3>Capas</h3>
+  <div class="lg">
+    <label><input type="checkbox" id="c_fj" checked><span class="sw" style="background:#35e0ff"></span>Quebrada y límite de la faja de 30 m</label>
+    <label><input type="checkbox" id="c_pr" checked><span class="sw" style="background:#ffd60a"></span>Linderos de predios</label>
+    <label><input type="checkbox" id="c_pd" checked><span class="sw" style="background:#fff36b"></span>Pendiente de 30 % o más</label>
+    <label><input type="checkbox" id="c_km"><span class="sw" style="background:#fff"></span>Abscisas cada 200 m</label>
+  </div>
+</aside>
+<div id="ui">
+  <button id="bTop">Vista de planta</button>
+  <button id="b3d">Vista 3D</button>
+  <button id="bPtap">PTAP</button>
+  <button id="bTq">Tanques</button>
+  <button id="bPanel">Panel</button>
+</div>
+<div id="load"><div id="lt">Cargando modelo (24&nbsp;MB)…</div><div id="bar"><i></i></div></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three-mesh-bvh":"https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {computeBoundsTree, disposeBoundsTree, acceleratedRaycast} from 'three-mesh-bvh';
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+
+const $=id=>document.getElementById(id), fmt=n=>Math.round(n).toLocaleString('es-CO');
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x14161a);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,1,30000);
+scene.add(new THREE.AmbientLight(0xffffff,1.1)); const sun=new THREE.DirectionalLight(0xffffff,1.2); sun.position.set(1,2,1); scene.add(sun);
+const controls=new OrbitControls(camera,canvas);
+controls.enableDamping=true; controls.dampingFactor=0.08; controls.rotateSpeed=0.6; controls.panSpeed=0.9; controls.zoomSpeed=1.1;
+controls.screenSpacePanning=false; controls.maxPolarAngle=Math.PI/2-0.02; controls.minDistance=20; controls.maxDistance=6000;
+
+// Marco común: coordenadas locales del modelo (este, norte, cota) -> escena (x, y arriba, -z norte)
+const V=(e,n,z)=>new THREE.Vector3(e,z,-n);
+const surf=[];            // superficies sobre las que se apoyan las líneas
+let dz=93;                // desfase entre la cota del modelo del vuelo y la cota cartográfica
+const ray=new THREE.Raycaster(); ray.firstHitOnly=true; const DOWN=new THREE.Vector3(0,-1,0);
+function ground(e,n,zc){ray.set(new THREE.Vector3(e,5000,-n),DOWN); const h=ray.intersectObjects(surf,false)[0]; return h?h.point.y:zc+dz;}
+const P=(p,lift)=>V(p[0],p[1],ground(p[0],p[1],p[2])-0+(lift||0)).setY(ground(p[0],p[1],p[2])+(lift||0));
+
+function tube(pts,col,r,lift,op){if(!pts||pts.length<2) return new THREE.Group();
+  const c=new THREE.CatmullRomCurve3(pts.map(p=>P(p,lift)),false,'catmullrom',0.05);
+  return new THREE.Mesh(new THREE.TubeGeometry(c,Math.max(pts.length*2,12),r,10,false),new THREE.MeshBasicMaterial({color:col,transparent:op<1,opacity:op||1}));}
+function sprite(draw,w,h,scale){const c=document.createElement('canvas'); c.width=w;c.height=h; draw(c.getContext('2d'));
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false})); s.scale.set(scale,scale*h/w,1); s.renderOrder=20; return s;}
+function label(t,sub,col,scale){return sprite(k=>{const w=640,h=sub?150:92; k.fillStyle='rgba(20,22,26,.9)';k.strokeStyle=col;k.lineWidth=6;k.fillRect(4,4,w-8,h-8);k.strokeRect(4,4,w-8,h-8);
+  k.fillStyle='#fff';k.font='600 44px system-ui,sans-serif';k.textAlign='center';k.fillText(t,320,sub?62:60,620); if(sub){k.fillStyle='#c3cfd8';k.font='36px system-ui,sans-serif';k.fillText(sub,320,114,620);}},640,sub?150:92,scale);}
+function badge(txt,col){return sprite(k=>{k.beginPath();k.arc(64,64,56,0,Math.PI*2);k.fillStyle=col;k.fill();k.lineWidth=8;k.strokeStyle='#14161a';k.stroke();
+  k.fillStyle='#14161a';k.font='700 66px system-ui,sans-serif';k.textAlign='center';k.textBaseline='middle';k.fillText(txt,64,68);},128,128,28);}
+function post(p,spr,h,col){const g=new THREE.Group(); const b=P(p,3), t=P(p,h); spr.position.copy(t); g.add(spr);
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([b,P(p,h-10)]),new THREE.LineBasicMaterial({color:col}))); return g;}
+
+let D=null, A={}, FJ=null, cur=null, center=new THREE.Vector3(), radius=900, gy0=1600;
+const jsonP=fetch('datos.json').then(r=>r.json());
+const draco=new DRACOLoader(); draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+const loader=new GLTFLoader(); loader.setDRACOLoader(draco);
+loader.load('modelo.glb', async gltf=>{
+  D=await jsonP; $('lt').textContent='Preparando trazados…';
+  const model=gltf.scene; model.rotation.x=-Math.PI/2; scene.add(model); model.updateMatrixWorld(true);
+  model.traverse(o=>{if(o.isMesh){o.geometry.computeBoundsTree(); surf.push(o);}});
+  // desfase vertical: mediana de (modelo - cota cartográfica) en puntos de las líneas que caen sobre el modelo
+  const dif=[]; for(const id in D.alt){D.alt[id].line.forEach((p,i)=>{if(i%6) return; ray.set(new THREE.Vector3(p[0],5000,-p[1]),DOWN); const h=ray.intersectObjects(surf,false)[0]; if(h) dif.push(h.point.y-p[2]);});}
+  if(dif.length>20){dif.sort((a,b)=>a-b); dz=dif[Math.floor(dif.length/2)];}
+  // terreno de apoyo (ortofoto oficial) para lo que queda fuera del modelo del vuelo
+  const g=new THREE.BufferGeometry(); const n=D.W*D.H, pos=new Float32Array(n*3), uv=new Float32Array(n*2);
+  for(let i=0;i<n;i++){pos[3*i]=D.gx[i];pos[3*i+1]=D.gz[i]+dz-4;pos[3*i+2]=-D.gy[i]; uv[2*i]=(i%D.W)/(D.W-1); uv[2*i+1]=1-Math.floor(i/D.W)/(D.H-1);}
+  const idx=[]; for(let r=0;r<D.H-1;r++) for(let c=0;c<D.W-1;c++){const a=r*D.W+c,b=a+1,d=a+D.W,e=d+1; idx.push(a,d,b,b,d,e);}
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.setIndex(idx); g.computeBoundsTree();
+  const tx=new THREE.TextureLoader().load('base.jpg'); tx.colorSpace=THREE.SRGBColorSpace; tx.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const ext=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:tx})); scene.add(ext); ext.updateMatrixWorld(true); surf.push(ext);
+  build();
+  const bb=new THREE.Box3().setFromObject(ext); bb.getCenter(center); radius=Math.max(bb.max.x-bb.min.x,bb.max.z-bb.min.z)/2; gy0=ground(center.x,-center.z,1600);
+  view3d(false); show(location.hash.slice(1)||'alt3');
+  $('load').style.opacity=0; setTimeout(()=>$('load').remove(),450);
+}, ev=>{ if(ev.total) document.querySelector('#bar i').style.width=(100*ev.loaded/ev.total)+'%'; });
+
+function build(){
+  FJ=new THREE.Group(); D.faja.forEach(r=>FJ.add(tube(r,0x35e0ff,1.6,2.5,1))); D.cauce.forEach(r=>FJ.add(tube(r,0x1f6bff,2.6,2,1))); scene.add(FJ);
+  D.pts.forEach((p,i)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(9,9,16,24),new THREE.MeshBasicMaterial({color:0xffd60a})); m.position.copy(P(p.p,8)); scene.add(m); scene.add(post(p.p,label(p.n,p.c,'#ffd60a',120),130+i*8,0xffd60a));});
+  const tabs=$('tabs');
+  for(const id in D.alt){const a=D.alt[id]; const g={all:new THREE.Group(),pr:new THREE.Group(),pd:new THREE.Group(),km:new THREE.Group()};
+    g.all.add(tube(a.line,0xffffff,7.5,5,0.35)); g.all.add(tube(a.line,a.col,4.8,5,1));
+    a.cruces.forEach(c=>{const m=new THREE.Mesh(new THREE.OctahedronGeometry(12),new THREE.MeshBasicMaterial({color:0x35e0ff})); m.position.copy(P(c.p,16)); g.all.add(m); g.all.add(post(c.p,label(c.n,c.ab,'#35e0ff',90),95,0x35e0ff));});
+    a.predios.forEach((p,i)=>{p.lim.forEach(l=>g.pr.add(tube(l,p.col,1.3,2.5,1))); g.pr.add(post(p.p,badge(String(i+1),p.col),34+(i%2)*16,p.col));});
+    a.fuertes.forEach(f=>g.pd.add(tube(f.l,0xfff36b,6.2,6,1)));
+    a.kms.forEach(k=>{const m=new THREE.Mesh(new THREE.SphereGeometry(6,16,12),new THREE.MeshBasicMaterial({color:0xffffff})); m.position.copy(P(k.p,7)); g.km.add(m); const s=label(k.t,null,'#ffffff',44); s.position.copy(P(k.p,22)); g.km.add(s);});
+    g.all.add(g.pr,g.pd,g.km); g.all.visible=false; scene.add(g.all); A[id]=g;
+    const b=document.createElement('button'); b.textContent=a.nom; b.id='t_'+id; b.style.setProperty('--c',a.col); b.onclick=()=>{location.hash=id; show(id);}; tabs.appendChild(b);}
+  ['c_fj','c_pr','c_pd','c_km'].forEach(i=>$(i).addEventListener('change',sync));
+}
+function show(id){ if(!D.alt[id]) id='alt3'; cur=id; const a=D.alt[id], r=a.res;
+  for(const i in A){A[i].all.visible=(i===id); $('t_'+i).classList.toggle('on',i===id);}
+  document.documentElement.style.setProperty('--act',a.col); $('tt').textContent=a.nom; $('ds').textContent=a.desc;
+  const rows=[['Longitud en planta',fmt(r.long_2d)+' m'],['Tubería siguiendo el terreno',fmt(r.long_3d)+' m'],['Por vía',fmt(r.m_via)+' m'],['Por predios',fmt(r.m_predios)+' m'],['Lado de la quebrada','Margen '+r.margen],
+    ['Cruces de la quebrada',a.cruces.length?`<span class="warn">${a.cruces.length} (permiso de ocupación de cauce)</span>`:'<span class="ok">Ninguno</span>'],
+    ['Dentro de la faja de 30 m',r.faja?`<span class="warn">${fmt(r.faja)} m, solo en los cruces</span>`:'<span class="ok">0 m</span>'],
+    ['Pendiente de 30 % o más',fmt(r.pend30)+' m'],['Purgas / ventosas',r.purgas+' / '+r.ventosas],
+    ['Altura estática al tanque nuevo',r.hest+' m'],['Altura dinámica (20 – 33,18 L/s)',r.adt[0]+' – '+r.adt[1]+' m'],['Potencia (20 – 33,18 L/s)',r.hp[0]+' – '+r.hp[1]+' HP'],['Bombeo por etapas','125 m a La Gruta + 86 m']];
+  $('kv').innerHTML=rows.map(x=>`<dt>${x[0]}</dt><dd>${x[1]}</dd>`).join('');
+  $('cz').style.display=a.cruces.length?'':'none';
+  $('czl').innerHTML=a.cruces.map(c=>`<p class="cr"><b>${c.n} · ${c.ab}</b><br>${c.xy} · ${c.faja} m dentro de la faja<br>${c.why}</p>`).join('');
+  $('pl').innerHTML=a.predios.map((p,i)=>`<li><span class="nb" style="background:${p.col}">${i+1}</span><b>${p.n}</b> · ficha ${p.ficha} · ${p.ab} · ${fmt(p.lm)} m</li>`).join('')||'<li>Recorre vía pública.</li>';
+  $('pd').innerHTML=a.fuertes.map(f=>`<li><b>${f.s}</b> · ${f.t} · ${f.lm} m</li>`).join('');
+  sync(); }
+function sync(){ if(FJ) FJ.visible=$('c_fj').checked; if(cur){A[cur].pr.visible=$('c_pr').checked; A[cur].pd.visible=$('c_pd').checked; A[cur].km.visible=$('c_km').checked;} }
+
+function flyTo(pos,tgt){const p0=camera.position.clone(),t0=controls.target.clone(),st=performance.now(),dur=700;
+  (function step(){const k=Math.min(1,(performance.now()-st)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; camera.position.lerpVectors(p0,pos,e); controls.target.lerpVectors(t0,tgt,e); if(k<1) requestAnimationFrame(step);})();}
+function view3d(fly=true){const pos=new THREE.Vector3(center.x+radius*0.9,gy0+radius*0.9,center.z+radius*1.1), tgt=new THREE.Vector3(center.x,gy0,center.z); fly?flyTo(pos,tgt):(camera.position.copy(pos),controls.target.copy(tgt));}
+function viewAt(p,d){const t=P(p,0); flyTo(new THREE.Vector3(t.x+d*0.7,t.y+d*0.6,t.z+d*0.7),t);}
+$('bTop').onclick=()=>flyTo(new THREE.Vector3(center.x,gy0+radius*2.4,center.z+0.001),new THREE.Vector3(center.x,gy0,center.z));
+$('b3d').onclick=()=>view3d();
+$('bPtap').onclick=()=>viewAt(D.pts[0].p,420);
+$('bTq').onclick=()=>viewAt(D.pts[1].p,560);
+$('bPanel').onclick=()=>{const p=$('panel'); p.style.display=(p.style.display==='none')?'':'none';};
+addEventListener('hashchange',()=>{if(D) show(location.hash.slice(1));});
+const mouse=new THREE.Vector2(), r2=new THREE.Raycaster(); r2.firstHitOnly=true;
+canvas.addEventListener('dblclick',e=>{mouse.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1); r2.setFromCamera(mouse,camera); const hit=r2.intersectObjects(surf,false)[0];
+  if(hit){const off=camera.position.clone().sub(controls.target).multiplyScalar(0.6); flyTo(hit.point.clone().add(off),hit.point.clone());}});
+function resize(){renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();}
+addEventListener('resize',resize); resize();
+(function loop(){controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);})();
+</script>
+</body>
+</html>
