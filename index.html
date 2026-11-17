@@ -99,11 +99,19 @@ let dz=93;                // desfase entre la cota del modelo del vuelo y la cot
 const ray=new THREE.Raycaster(); ray.firstHitOnly=true; const DOWN=new THREE.Vector3(0,-1,0);
 // Cota de apoyo: superficie más alta bajo el punto, siempre que sea coherente con la cota cartográfica; si no, la cartográfica.
 function ground(e,n,zc){ray.set(new THREE.Vector3(e,5000,-n),DOWN); const h=ray.intersectObjects(surf,false)[0]; const exp=zc+dz;
-  if(!h) return exp; const d=h.point.y-exp; return (d>32||d<-16)?exp:h.point.y;}
+  if(!h) return exp-4; const d=h.point.y-exp; return (d>22||d<-10)?exp-4:h.point.y;}
 const P=(p,lift)=>V(p[0],p[1],ground(p[0],p[1],p[2])+(lift||0));
 
+// Apoyo continuo de una línea: se toma, punto a punto, la diferencia entre el modelo y la cota cartográfica, se descartan
+// los valores incoherentes y se suaviza a lo largo de la línea, de modo que la tubería no dé saltos verticales.
+function drape(pts,lift){const n=pts.length, off=new Array(n);
+  for(let i=0;i<n;i++){const p=pts[i]; ray.set(new THREE.Vector3(p[0],5000,-p[1]),DOWN); const h=ray.intersectObjects(surf,false)[0];
+    let d=h?h.point.y-p[2]-dz:-4; if(d>22||d<-10) d=-4; off[i]=d;}
+  const med=new Array(n), w=8; for(let i=0;i<n;i++){const a=off.slice(Math.max(0,i-w),Math.min(n,i+w+1)).sort((x,y)=>x-y); med[i]=a[Math.floor(a.length/2)];}
+  const sm=new Array(n), w2=10; for(let i=0;i<n;i++){let s=0,c=0; for(let j=Math.max(0,i-w2);j<Math.min(n,i+w2+1);j++){s+=med[j];c++;} sm[i]=s/c;}
+  return pts.map((p,i)=>V(p[0],p[1],p[2]+dz+sm[i]+(lift||0)));}
 function tube(pts,col,r,lift,op){if(!pts||pts.length<2) return new THREE.Group();
-  const c=new THREE.CatmullRomCurve3(pts.map(p=>P(p,lift)),false,'catmullrom',0.05);
+  const c=new THREE.CatmullRomCurve3(drape(pts,lift),false,'catmullrom',0.05);
   return new THREE.Mesh(new THREE.TubeGeometry(c,Math.max(pts.length*2,12),r,10,false),new THREE.MeshBasicMaterial({color:col,transparent:op<1,opacity:op||1}));}
 function sprite(draw,w,h,scale){const c=document.createElement('canvas'); c.width=w;c.height=h; draw(c.getContext('2d'));
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false})); s.scale.set(scale,scale*h/w,1); s.renderOrder=20; return s;}
@@ -134,7 +142,7 @@ loader.load('modelo.glb', async gltf=>{
      return g[k]*(1-fx)*(1-fy)+g[k+1]*fx*(1-fy)+g[k+W]*(1-fx)*fy+g[k+W+1]*fx*fy;};
    surf.forEach(o=>{const geo=o.geometry, pos=geo.attributes.position, idx=geo.index; if(!idx) return;
      const bad=new Uint8Array(pos.count);
-     for(let i=0;i<pos.count;i++){const z=ref(pos.getX(i),pos.getY(i)); if(z===null) continue; const d=pos.getZ(i)-(z+dz); if(d>32||d<-16) bad[i]=1;}
+     for(let i=0;i<pos.count;i++){const z=ref(pos.getX(i),pos.getY(i)); if(z===null) continue; const d=pos.getZ(i)-(z+dz); if(d>26||d<-10) bad[i]=1;}
      const src=idx.array, out=new src.constructor(src.length); let n=0;
      for(let t=0;t<src.length;t+=3){const a=src[t],b=src[t+1],c=src[t+2]; if(bad[a]||bad[b]||bad[c]) continue; out[n++]=a; out[n++]=b; out[n++]=c;}
      geo.setIndex(new THREE.BufferAttribute(out.slice(0,n),1)); geo.disposeBoundsTree(); geo.computeBoundsTree();});}
