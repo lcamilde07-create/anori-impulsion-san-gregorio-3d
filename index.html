@@ -50,7 +50,7 @@
   <h3>Tramos de pendiente fuerte (en amarillo)</h3><ul id="pd"></ul>
   <h3>Capas</h3>
   <div class="lg">
-    <label><input type="checkbox" id="c_fj" checked><span class="sw" style="background:#35e0ff"></span>Quebrada y límite de la faja de 30 m</label>
+    <label><input type="checkbox" id="c_fj" checked><span class="sw" style="background:#c9a2ff;height:10px"></span>Faja de protección de 30 m (lila) y quebrada (azul)</label>
     <label><input type="checkbox" id="c_pr" checked><span class="sw" style="background:#ffd60a"></span>Linderos de predios</label>
     <label><input type="checkbox" id="c_pd" checked><span class="sw" style="background:#fff36b"></span>Pendiente de 30 % o más</label>
     <label><input type="checkbox" id="c_km"><span class="sw" style="background:#fff"></span>Abscisas cada 200 m</label>
@@ -122,7 +122,7 @@ function badge(txt,col){return sprite(k=>{k.beginPath();k.arc(64,64,56,0,Math.PI
 function post(p,spr,h,col){const g=new THREE.Group(); const b=P(p,3), t=P(p,h); spr.position.copy(t); g.add(spr);
   g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([b,P(p,h-10)]),new THREE.LineBasicMaterial({color:col}))); return g;}
 
-let D=null, A={}, FJ=null, cur=null, center=new THREE.Vector3(), radius=900, gy0=1600;
+let D=null, A={}, FJ=null, FJo=[], cur=null, center=new THREE.Vector3(), radius=900, gy0=1600;
 const jsonP=fetch('datos.json').then(r=>r.json());
 const draco=new DRACOLoader(); draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
 const loader=new GLTFLoader(); loader.setDRACOLoader(draco);
@@ -160,7 +160,16 @@ loader.load('modelo.glb', async gltf=>{
 }, ev=>{ if(ev.total) document.querySelector('#bar i').style.width=(100*ev.loaded/ev.total)+'%'; });
 
 function build(){
-  FJ=new THREE.Group(); D.faja.forEach(r=>FJ.add(tube(r,0x35e0ff,1.6,2.5,1))); D.cauce.forEach(r=>FJ.add(tube(r,0x1f6bff,2.6,2,1))); scene.add(FJ);
+  FJ=new THREE.Group(); D.cauce.forEach(r=>FJ.add(tube(r,0x1f6bff,2.6,2,1))); scene.add(FJ);
+  // Faja de protección de 30 m como relleno lila, extendido sobre el modelo del vuelo y sobre el terreno de apoyo
+  {const ft=new THREE.TextureLoader().load('faja.png'); ft.colorSpace=THREE.SRGBColorSpace; ft.anisotropy=renderer.capabilities.getMaxAnisotropy();
+   const W=D.W,H=D.H,i1=W-1,i2=(H-1)*W, x0=D.gx[0],y0=D.gy[0], ax=D.gx[i1]-x0, ay=D.gy[i1]-y0, bx=D.gx[i2]-x0, by=D.gy[i2]-y0;
+   const sm=new THREE.ShaderMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4,
+     uniforms:{map:{value:ft},p0:{value:new THREE.Vector2(x0,y0)},A:{value:new THREE.Vector2(ax,ay)},B:{value:new THREE.Vector2(bx,by)},op:{value:0.62}},
+     vertexShader:'uniform vec2 p0,A,B; varying vec2 vUv; void main(){vec2 d=position.xy-p0; float det=A.x*B.y-A.y*B.x; float c=(d.x*B.y-d.y*B.x)/det; float r=(A.x*d.y-A.y*d.x)/det; vUv=vec2(c,1.0-r); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+     fragmentShader:'uniform sampler2D map; uniform float op; varying vec2 vUv; void main(){if(vUv.x<0.0||vUv.x>1.0||vUv.y<0.0||vUv.y>1.0) discard; vec4 t=texture2D(map,vUv); if(t.a<0.05) discard; gl_FragColor=vec4(t.rgb,t.a*op);\n#include <colorspace_fragment>\n}'});
+   surf.forEach((o,i)=>{let m; if(i<surf.length-1){m=new THREE.Mesh(o.geometry,sm);} else {m=new THREE.Mesh(o.geometry,new THREE.MeshBasicMaterial({map:ft,transparent:true,opacity:0.62,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));}
+     m.renderOrder=2; m.raycast=()=>{}; o.add(m); FJo.push(m);});}
   D.pts.forEach((p,i)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(9,9,16,24),new THREE.MeshBasicMaterial({color:0xffd60a})); m.position.copy(P(p.p,8)); scene.add(m); scene.add(post(p.p,label(p.n,p.c,'#ffd60a',120),130+i*8,0xffd60a));});
   const tabs=$('tabs');
   for(const id in D.alt){const a=D.alt[id]; const g={all:new THREE.Group(),pr:new THREE.Group(),pd:new THREE.Group(),km:new THREE.Group()};
@@ -187,7 +196,7 @@ function show(id){ if(!D.alt[id]) id='alt3'; cur=id; const a=D.alt[id], r=a.res;
   $('pl').innerHTML=a.predios.map((p,i)=>`<li><span class="nb" style="background:${p.col}">${i+1}</span><b>${p.n}</b> · ficha ${p.ficha} · ${p.ab} · ${fmt(p.lm)} m</li>`).join('')||'<li>Recorre vía pública.</li>';
   $('pd').innerHTML=a.fuertes.map(f=>`<li><b>${f.s}</b> · ${f.t} · ${f.lm} m</li>`).join('');
   sync(); }
-function sync(){ if(FJ) FJ.visible=$('c_fj').checked; if(cur){A[cur].pr.visible=$('c_pr').checked; A[cur].pd.visible=$('c_pd').checked; A[cur].km.visible=$('c_km').checked;} }
+function sync(){ if(FJ) FJ.visible=$('c_fj').checked; FJo.forEach(m=>m.visible=$('c_fj').checked); if(cur){A[cur].pr.visible=$('c_pr').checked; A[cur].pd.visible=$('c_pd').checked; A[cur].km.visible=$('c_km').checked;} }
 
 function flyTo(pos,tgt){const p0=camera.position.clone(),t0=controls.target.clone(),st=performance.now(),dur=700;
   (function step(){const k=Math.min(1,(performance.now()-st)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; camera.position.lerpVectors(p0,pos,e); controls.target.lerpVectors(t0,tgt,e); if(k<1) requestAnimationFrame(step);})();}
